@@ -14,7 +14,6 @@ funciones puras para parsear; los efectos (disco, SQL) quedan al final.
 
 Límites (a propósito, KISS): front matter YAML con pares `clave: valor` y
 listas en línea `tags: [a, b]`. Nada de TOML (+++) ni listas multilínea.
-
 Docs: https://docs.python.org/3/library/sqlite3.html
       https://www.sqlite.org/json1.html
 """
@@ -91,8 +90,8 @@ def parse_meta(block):
 
 # (patrón, reemplazo) aplicados en orden: Markdown → texto plano
 CLEANERS = [
-    (r"```.*?```", " "),                              # bloques de código
-    (r"`([^`]*)`", r"\1"),                            # código en línea
+    (r"```.*?```", " "),                                # bloques de código
+    (r"`([^`]*)`", r"\1"),                                # código en línea
     (r"!?\[([^\]]*)\]\([^)]*\)", r"\1"),              # enlaces/imágenes → texto
     (r"^[ \t]{0,3}(?:#{1,6}|>|[-*+]|\d+\.)[ \t]+", ""),  # marcas de bloque
     (r"\*{1,3}", ""),                                 # énfasis
@@ -132,13 +131,12 @@ def read_page(path):
     }
 
 
-def read_all():
+def read_all(include_drafts=False):
     files = (p for p in sorted(CONTENT.rglob("*.md")) if p.name != "_index.md")
-    return [page for page in map(read_page, files) if not page["draft"]]
+    return [page for page in map(read_page, files) if include_drafts or not page["draft"]]
 
 
 # --- efectos: disco y SQL ----------------------------------------------------
-
 def build_db(pages):
     DB.parent.mkdir(parents=True, exist_ok=True)
     DB.unlink(missing_ok=True)
@@ -160,9 +158,12 @@ def export(con, query, out):
 
 
 def main():
+    include_drafts = "--drafts" in sys.argv or "-D" in sys.argv
+
     if not CONTENT.is_dir():
         sys.exit("index.py: ejecútalo desde la raíz del repo (make index)")
-    pages = read_all()
+
+    pages = read_all(include_drafts=include_drafts)
     con = build_db(pages)
     export(con, Q_SEARCH, OUT_SEARCH)
     export(con, Q_TAGS, OUT_TAGS)
