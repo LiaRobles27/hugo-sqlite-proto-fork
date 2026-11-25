@@ -145,3 +145,10 @@ git log --format='%h %ad %s' --date=iso | head -20
 ```
 
 "Recuerda ... KISS!" :-)
+
+## Migración a Chyrp Lite (P1.2 - rama `chyrp-lite`)
+
+- Añadido `tools/migrar.py` (ETL para migrar entradas `content/posts/*.md` y páginas `content/about.md` a SQLite de Chyrp Lite, con soporte para etiquetas numéricas).
+- Añadido `tools/test_migrar.py` (13 pruebas unitarias con `unittest`).
+- Añadidos los objetivos `test` y `migrar` al `Makefile`.
+- Añadido el informe `P1.2-Robles.md`.
