@@ -1,4 +1,4 @@
-.PHONY: help index build serve check clean check-invites
+.PHONY: help index build serve check clean check-invites test migrar
 
 help:
 	@echo "Comandos disponibles:"
@@ -22,3 +22,10 @@ check: index
 
 clean:
 	rm -rf build/ static/search.json data/tags.json public/
+
+test:   ## Prueba las funciones puras de tools/migrar.py
+	python3 -m unittest discover -s tools -v
+
+migrar:   ## Markdown → SQLite de Chyrp Lite: make migrar DESTINO=/ruta/copia.sqlite [SIMULACRO=1]
+	@test -n "$(DESTINO)" || { echo "Uso: make migrar DESTINO=/ruta/copia.sqlite [SIMULACRO=1]"; exit 1; }
+	python3 tools/migrar.py --destino "$(DESTINO)" $(if $(SIMULACRO),--simulacro,)
