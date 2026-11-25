@@ -152,3 +152,10 @@ git log --format='%h %ad %s' --date=iso | head -20
 - Añadido `tools/test_migrar.py` (13 pruebas unitarias con `unittest`).
 - Añadidos los objetivos `test` y `migrar` al `Makefile`.
 - Añadido el informe `P1.2-Robles.md`.
+
+## Migración a MariaDB (P1.3 - rama `mariadb`)
+
+- Añadido `tools/sqlite2maria.py` (filtro Unix que vuelca el SQLite de Chyrp Lite a SQL transaccional y repetible para MariaDB).
+- Añadido `tools/test_sqlite2maria.py` (pruebas unitarias con `unittest`, 26 tests en total).
+- Añadido el objetivo `maria` al `Makefile`.
+- Añadido el informe `P1.3-Robles.md`.
