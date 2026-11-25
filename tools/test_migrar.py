@@ -5,7 +5,7 @@ Ejecuta:  make test   (o: python3 -m unittest discover -s tools -v)
 """
 import unittest
 
-from migrar import SQL_DATETIME_ZERO, etiquetas_json, fecha_chyrp, slugify, transformar
+from migrar import SQL_DATETIME_ZERO, etiquetas_json, fecha_chyrp, slugify, transformar, transformar_pagina
 
 ENTRADA = {
     "slug": "hola-hugo",
@@ -63,6 +63,25 @@ class TestTransformar(unittest.TestCase):
         # Misma entrada, mismo resultado, y la entrada original no cambia.
         self.assertEqual(self.fila, transformar(ENTRADA, 1, "2026-11-16 12:00:00"))
         self.assertEqual(ENTRADA["tags"], ["hugo", "Árbol B"])
+
+
+    def test_etiqueta_numerica(self):
+        self.assertEqual(etiquetas_json([2026]), '{"2026":"2026"}')
+
+class TestTransformarPagina(unittest.TestCase):
+    def test_pagina_about(self):
+        pag = transformar_pagina({
+            "slug": "about",
+            "titulo": "Acerca de",
+            "fecha": "2026-10-27",
+            "cuerpo": "Texto de prueba.",
+            "tags": [],
+            "draft": False,
+        }, user_id=1, ahora="2026-11-16 12:00:00")
+        self.assertEqual(pag["clean"], "about")
+        self.assertEqual(pag["public"], 1)
+        self.assertEqual(pag["created_at"], "2026-10-27 00:00:00")
+        self.assertEqual(pag["updated_at"], SQL_DATETIME_ZERO)
 
 if __name__ == "__main__":
     unittest.main()

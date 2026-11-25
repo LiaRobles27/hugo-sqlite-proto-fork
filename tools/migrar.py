@@ -38,7 +38,7 @@ SQL_DATETIME_ZERO = "1000-01-01 00:00:00"
 
 def slugify(texto):
     """'Árbol B' → 'arbol-b' (algo parecido al campo `clean` de Chyrp Lite)."""
-    sin_tildes = unicodedata.normalize("NFKD", texto).encode("ascii", "ignore").decode()
+    sin_tildes = unicodedata.normalize("NFKD", str(texto)).encode("ascii", "ignore").decode()
     return re.sub(r"[^a-z0-9]+", "-", sin_tildes.lower()).strip("-")
 
 def fecha_chyrp(valor, por_defecto):
@@ -57,7 +57,7 @@ def etiquetas_json(nombres):
     """
     if not nombres:
         return "[]"
-    asociacion = {nombre: slugify(nombre) for nombre in nombres}
+    asociacion = {str(nombre): slugify(nombre) for nombre in nombres}
     # PHP escribe "/" como "\/" y Python no: igualamos los bytes.
     return json.dumps(asociacion, separators=(",", ":")).replace("/", "\\/")
 
@@ -94,6 +94,24 @@ def transformar(entrada, user_id, ahora):
             "body": entrada["cuerpo"],
             "tags": etiquetas_json(entrada["tags"]),
         },
+    }
+
+
+def transformar_pagina(entrada, user_id, ahora):
+    """Página estática (ej. about.md) → fila para la tabla `pages` de Chyrp Lite."""
+    slug = slugify(entrada["slug"])
+    return {
+        "title": entrada["titulo"],
+        "body": entrada["cuerpo"],
+        "public": 0 if entrada["draft"] else 1,
+        "show_in_list": 1,
+        "list_order": 0,
+        "clean": slug,
+        "url": slug,
+        "user_id": user_id,
+        "parent_id": 0,
+        "created_at": fecha_chyrp(entrada["fecha"], ahora),
+        "updated_at": SQL_DATETIME_ZERO,
     }
 
 # --- efectos: disco y SQL ----------------------------------------------------
@@ -151,6 +169,49 @@ def cargar(destino, filas, simulacro=False):
     finally:
         con.close()
 
+
+def extraer_paginas(carpeta):
+    """Lee .md de nivel raíz en `carpeta` que no sean _index.md ni entradas con tags."""
+    p_dir = Path(carpeta)
+    if not p_dir.is_dir():
+        return []
+    paginas = []
+    for p in sorted(p_dir.glob("*.md")):
+        if p.name == "_index.md":
+            continue
+        entrada = leer_entrada(p)
+        if not entrada["tags"]:
+            paginas.append(entrada)
+    return paginas
+
+def existe_pagina(con, url):
+    return con.execute("SELECT 1 FROM pages WHERE url = ?", (url,)).fetchone() is not None
+
+def insertar_pagina(con, fila):
+    columnas = list(fila)
+    cur = con.execute(
+        f"INSERT INTO pages({', '.join(columnas)}) VALUES ({', '.join('?' * len(columnas))})",
+        [fila[c] for c in columnas])
+    return cur.lastrowid
+
+def cargar_paginas(destino, filas, simulacro=False):
+    """Inserta las páginas que falten en `pages`. Una sola transacción."""
+    con = sqlite3.connect(destino)
+    try:
+        with con:
+            resultado = []
+            for fila in filas:
+                url = fila["url"]
+                if existe_pagina(con, url):
+                    resultado.append(("omitida", url))
+                    continue
+                if not simulacro:
+                    insertar_pagina(con, fila)
+                resultado.append(("simulada" if simulacro else "creada", url))
+            return resultado
+    finally:
+        con.close()
+
 def main():
     ap = argparse.ArgumentParser(description="Markdown (P1.1) → SQLite de Chyrp Lite")
     ap.add_argument("--origen", default="content/posts", help="carpeta con los .md")
@@ -170,8 +231,14 @@ def main():
     filas = [transformar(e, user_id, ahora) for e in entradas]
     resultado = cargar(args.destino, filas, args.simulacro)
 
+    paginas = extraer_paginas(Path(args.origen).parent)
+    filas_pag = [transformar_pagina(p, user_id, ahora) for p in paginas]
+    res_pag = cargar_paginas(args.destino, filas_pag, args.simulacro)
+
     for estado, url in resultado:
         print(f"{estado:9} {url}")
+    for estado, url in res_pag:
+        print(f"{estado:9} page:{url}")
     nuevas = sum(1 for estado, _ in resultado if estado != "omitida")
     print(f"migrar: {len(entradas)} entradas leídas, {nuevas} nuevas, "
           f"{len(entradas) - nuevas} ya estaban")
